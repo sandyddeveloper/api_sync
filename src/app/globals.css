@@ -1,0 +1,5 @@
+/* Emptying default styles to use the custom ones in page.tsx */
+body {
+  margin: 0;
+  padding: 0;
+}
