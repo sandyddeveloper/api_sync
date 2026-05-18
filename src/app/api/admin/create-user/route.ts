@@ -76,6 +76,50 @@ export async function POST(request: Request) {
     await kv.set(`user:${normalizedUsername}`, userObj);
     await kv.sadd("users:all", normalizedUsername);
 
+    // 5. Optionally Register User in OneSignal
+    let oneSignalRegistered = false;
+    let oneSignalError = null;
+    
+    const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+    const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
+
+    if (ONESIGNAL_APP_ID && ONESIGNAL_API_KEY) {
+      try {
+        const osResponse = await fetch(
+          `https://onesignal.com/api/v1/apps/${ONESIGNAL_APP_ID}/users`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json; charset=utf-8",
+              "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
+            },
+            body: JSON.stringify({
+              identity: {
+                external_id: normalizedUsername,
+              },
+            }),
+          }
+        );
+
+        if (osResponse.ok) {
+          oneSignalRegistered = true;
+        } else {
+          const osResult = await osResponse.json();
+          // If the user already exists in OneSignal, we consider it successfully matched
+          const errString = JSON.stringify(osResult.errors || osResult);
+          if (errString.includes("already exists") || errString.includes("conflict")) {
+            oneSignalRegistered = true;
+          } else {
+            oneSignalError = osResult.errors || osResult.error || "OneSignal user registration failed";
+            console.warn("OneSignal user registration warning:", osResult);
+          }
+        }
+      } catch (err: any) {
+        oneSignalError = err.message;
+        console.error("Failed to connect to OneSignal for user registration:", err);
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -84,6 +128,10 @@ export async function POST(request: Request) {
           username: username.trim(),
           role: userRole,
           createdAt: userObj.createdAt,
+        },
+        oneSignal: {
+          registered: oneSignalRegistered,
+          error: oneSignalError,
         },
       },
       { status: 201 }
