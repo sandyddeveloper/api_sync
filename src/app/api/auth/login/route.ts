@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { kv } from "@/lib/kv";
 import { verifyPassword, generateToken } from "@/lib/auth";
 
 export async function POST(request: Request) {

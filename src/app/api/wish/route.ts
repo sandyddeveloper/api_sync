@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { kv } from "@vercel/kv";
+import { kv } from "@/lib/kv";
 
 export async function POST(request: Request) {
   try {
