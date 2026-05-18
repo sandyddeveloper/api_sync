@@ -10,6 +10,16 @@ export default function Home() {
   const [vaultUnlocked, setVaultUnlocked] = useState(false);
   const [wish, setWish] = useState("I wish for infinite possibilities.");
 
+  // Admin & User Authentication State
+  const [adminToken, setAdminToken] = useState("nila-admin-secret-2026");
+  const [regUsername, setRegUsername] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regRole, setRegRole] = useState("user");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [authResponse, setAuthResponse] = useState<any>(null);
+  const [loginResponse, setLoginResponse] = useState<any>(null);
+
   const fetchData = async (endpoint: string) => {
     setLoading(true);
     try {
@@ -88,17 +98,80 @@ export default function Home() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("Creating user...");
+    setAuthResponse(null);
+    try {
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-token": adminToken,
+        },
+        body: JSON.stringify({
+          username: regUsername,
+          password: regPassword,
+          role: regRole,
+        }),
+      });
+      const json = await res.json();
+      setAuthResponse(json);
+      if (json.success) {
+        setStatus("User created successfully!");
+        setRegUsername("");
+        setRegPassword("");
+      } else {
+        setStatus(`Error: ${json.error}`);
+      }
+      setTimeout(() => setStatus(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setStatus("Failed to connect to API");
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("Logging in...");
+    setLoginResponse(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: loginUsername,
+          password: loginPassword,
+        }),
+      });
+      const json = await res.json();
+      setLoginResponse(json);
+      if (json.success) {
+        setStatus("Login successful!");
+      } else {
+        setStatus(`Error: ${json.error}`);
+      }
+      setTimeout(() => setStatus(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setStatus("Failed to connect to API");
+    }
+  };
+
   return (
     <main className="dashboard-container">
       <header className="glass-header">
         <h1>Nila Admin API Dashboard</h1>
-        <p>Manage app updates, email permissions, and push notifications.</p>
+        <p>Manage app updates, user authentications, and push notifications.</p>
       </header>
 
       <div className="tabs">
         <button onClick={() => setActiveTab("app-update")} className={activeTab === "app-update" ? "active" : ""}>App Update</button>
         <button onClick={() => setActiveTab("permissions")} className={activeTab === "permissions" ? "active" : ""}>Permissions</button>
         <button onClick={() => setActiveTab("actions")} className={activeTab === "actions" ? "active" : ""}>Trigger Actions</button>
+        <button onClick={() => setActiveTab("auth")} className={activeTab === "auth" ? "active" : ""}>User Management & Auth</button>
       </div>
 
       <div className="content-card glass">
@@ -166,6 +239,117 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {activeTab === "auth" && (
+              <div className="auth-view">
+                <div className="admin-token-section">
+                  <h3>🔑 Administrative Credentials</h3>
+                  <p className="description">Enter the secret admin token required to invoke the user registration API. By default, it uses the local development token.</p>
+                  <div className="input-group" style={{ marginBottom: "0", maxWidth: "100%" }}>
+                    <label>Admin Secret Token</label>
+                    <input 
+                      type="password" 
+                      value={adminToken} 
+                      onChange={(e) => setAdminToken(e.target.value)}
+                      placeholder="Enter admin secret..."
+                      style={{ width: "100%" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-grid">
+                  {/* Left panel: Create User */}
+                  <form onSubmit={handleCreateUser} className="auth-card">
+                    <h4>✨ Create User Account</h4>
+                    <p className="description">Admin registers a new user with username and password in Vercel KV.</p>
+                    
+                    <div className="input-group-compact">
+                      <label>Username</label>
+                      <input 
+                        type="text" 
+                        value={regUsername} 
+                        onChange={(e) => setRegUsername(e.target.value)}
+                        placeholder="e.g. santhosh_dev"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="input-group-compact">
+                      <label>Password</label>
+                      <input 
+                        type="password" 
+                        value={regPassword} 
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        required
+                      />
+                    </div>
+
+                    <div className="input-group-compact">
+                      <label>Account Role</label>
+                      <select 
+                        value={regRole} 
+                        onChange={(e) => setRegRole(e.target.value)}
+                        className="custom-select"
+                      >
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+
+                    <button type="submit" className="btn-primary" style={{ marginTop: "1rem", cursor: "pointer", border: "none" }}>
+                      Create Account
+                    </button>
+
+                    {authResponse && (
+                      <div className={`response-box ${authResponse.success ? "success" : "error"}`}>
+                        <strong>Response status: {authResponse.success ? "201 Created" : "Bad Request"}</strong>
+                        <pre style={{ fontSize: "11px", margin: "5px 0 0 0" }}>{JSON.stringify(authResponse, null, 2)}</pre>
+                      </div>
+                    )}
+                  </form>
+
+                  {/* Right panel: Login User */}
+                  <form onSubmit={handleLogin} className="auth-card">
+                    <h4>🔒 User Login Gateway</h4>
+                    <p className="description">Authenticate credentials against KV database and obtain a session token.</p>
+                    
+                    <div className="input-group-compact">
+                      <label>Username</label>
+                      <input 
+                        type="text" 
+                        value={loginUsername} 
+                        onChange={(e) => setLoginUsername(e.target.value)}
+                        placeholder="Enter username"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="input-group-compact">
+                      <label>Password</label>
+                      <input 
+                        type="password" 
+                        value={loginPassword} 
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="Enter password"
+                        required
+                      />
+                    </div>
+
+                    <button type="submit" className="btn-primary" style={{ marginTop: "4.8rem", cursor: "pointer", border: "none" }}>
+                      Sign In & Generate Token
+                    </button>
+
+                    {loginResponse && (
+                      <div className={`response-box ${loginResponse.success ? "success" : "error"}`}>
+                        <strong>Response status: {loginResponse.success ? "200 OK" : "401 Unauthorized"}</strong>
+                        <pre style={{ fontSize: "11px", margin: "5px 0 0 0" }}>{JSON.stringify(loginResponse, null, 2)}</pre>
+                      </div>
+                    )}
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -228,6 +412,7 @@ export default function Home() {
           display: flex;
           gap: 1rem;
           justify-content: center;
+          flex-wrap: wrap;
         }
 
         .tabs button {
@@ -389,6 +574,7 @@ export default function Home() {
           border-radius: 99px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.5);
           animation: slideUp 0.3s ease-out;
+          z-index: 1000;
         }
 
         @keyframes slideUp {
@@ -402,6 +588,126 @@ export default function Home() {
           border-radius: 12px;
           overflow-x: auto;
           color: #a5b4fc;
+        }
+
+        /* Authentication Page Custom Styles */
+        .auth-view {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .admin-token-section {
+          background: rgba(99, 102, 241, 0.05);
+          border: 1px solid var(--glass-border);
+          padding: 1.5rem;
+          border-radius: 16px;
+          margin-bottom: 2rem;
+        }
+
+        .admin-token-section h3 {
+          margin: 0 0 0.5rem 0;
+          color: #a5b4fc;
+        }
+
+        .description {
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          margin: 0 0 1rem 0;
+          line-height: 1.4;
+        }
+
+        .auth-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 2rem;
+        }
+
+        .auth-card {
+          background: rgba(255, 255, 255, 0.015);
+          border: 1px solid var(--glass-border);
+          padding: 1.5rem;
+          border-radius: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .auth-card h4 {
+          margin: 0;
+          font-size: 1.2rem;
+          color: #fff;
+          border-bottom: 1px solid var(--glass-border);
+          padding-bottom: 0.5rem;
+        }
+
+        .input-group-compact {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+        }
+
+        .input-group-compact label {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .input-group-compact input, .custom-select {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--glass-border);
+          color: white;
+          padding: 0.65rem 0.85rem;
+          border-radius: 8px;
+          outline: none;
+          font-family: inherit;
+          font-size: 0.9rem;
+          transition: border-color 0.2s;
+        }
+
+        .input-group-compact input:focus, .custom-select:focus {
+          border-color: var(--accent);
+        }
+
+        .custom-select {
+          cursor: pointer;
+          appearance: none;
+          background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          background-size: 1rem;
+          padding-right: 2rem;
+        }
+
+        .custom-select option {
+          background: #090d16;
+          color: white;
+        }
+
+        .response-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          text-align: left;
+        }
+
+        .response-box.success {
+          background: rgba(34, 197, 94, 0.06);
+          border: 1px solid rgba(34, 197, 94, 0.2);
+          color: #4ade80;
+        }
+
+        .response-box.error {
+          background: rgba(239, 68, 68, 0.06);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: #f87171;
+        }
+
+        @media (max-width: 768px) {
+          .auth-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </main>
