@@ -44,7 +44,15 @@ export async function POST(request: Request) {
     // If target player IDs are provided, direct the push to them specifically.
     // Otherwise, target the general "Subscribed Users" segment.
     if (playerIds && Array.isArray(playerIds) && playerIds.length > 0) {
-      pushPayload.include_subscription_ids = playerIds;
+      // Check if target is a valid UUID subscription ID, otherwise target as external username alias
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(playerIds[0]);
+      if (isUuid) {
+        pushPayload.include_subscription_ids = playerIds;
+      } else {
+        pushPayload.include_aliases = {
+          external_id: playerIds,
+        };
+      }
     } else {
       pushPayload.included_segments = ["Subscribed Users"];
     }
