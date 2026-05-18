@@ -5,7 +5,7 @@ import { verifyPassword, generateToken } from "@/lib/auth";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { username, password } = body;
+    const { username, password, subscriptionId } = body;
 
     // 1. Basic Validation
     if (!username || typeof username !== "string" || !password || typeof password !== "string") {
@@ -34,6 +34,13 @@ export async function POST(request: Request) {
         { success: false, error: "Invalid username or password." },
         { status: 401 }
       );
+    }
+
+    // 3.5. Save OneSignal subscriptionId if provided
+    if (subscriptionId) {
+      user.subscriptionId = subscriptionId;
+      await kv.set(`user:${normalizedUsername}`, user);
+      await kv.sadd("users:all", normalizedUsername); // Ensure catalog synchronization
     }
 
     // 4. Generate Session Token

@@ -69,6 +69,13 @@ class LocalKV {
     return addedCount;
   }
 
+  async smembers(key: string): Promise<string[]> {
+    this.load();
+    const val = this.data[key];
+    if (!Array.isArray(val)) return [];
+    return val as string[];
+  }
+
   async lpush(key: string, ...elements: any[]): Promise<number> {
     this.load();
     if (!Array.isArray(this.data[key])) {
