@@ -44,8 +44,6 @@ export async function POST(request: Request) {
     // If target player IDs are provided, direct the push to them specifically.
     // Otherwise, target the general "Subscribed Users" segment.
     if (playerIds && Array.isArray(playerIds) && playerIds.length > 0) {
-      // Support both include_player_ids (legacy) and include_subscription_ids (current standard)
-      pushPayload.include_player_ids = playerIds;
       pushPayload.include_subscription_ids = playerIds;
     } else {
       pushPayload.included_segments = ["Subscribed Users"];

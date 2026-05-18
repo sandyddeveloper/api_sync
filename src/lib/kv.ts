@@ -9,8 +9,11 @@ class LocalKV {
   private data: Record<string, any> = {};
 
   constructor() {
-    // Save inside the active workspace directory as .local_kv.json
-    this.filePath = path.join(process.cwd(), ".local_kv.json");
+    // Save in /tmp/local_kv.json in Vercel/serverless environments, otherwise local root
+    const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION);
+    this.filePath = isServerless 
+      ? path.join("/tmp", "local_kv.json") 
+      : path.join(process.cwd(), ".local_kv.json");
     this.load();
   }
 
