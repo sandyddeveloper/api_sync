@@ -36,11 +36,79 @@ export default function Home() {
     setLoading(false);
   };
 
+  // Push Notification Composer States
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<string>("");
+  const [customPushTitle, setCustomPushTitle] = useState("Cosmic Alignment 🌌");
+  const [customPushMessage, setCustomPushMessage] = useState("A new celestial shift has occurred in your vault...");
+  const [fetchingUsers, setFetchingUsers] = useState(false);
+
+  const fetchUsers = async () => {
+    setFetchingUsers(true);
+    try {
+      const res = await fetch("/api/admin/list-users", {
+        headers: {
+          "x-admin-token": adminToken
+        }
+      });
+      const json = await res.json();
+      if (json.success) {
+        setUsersList(json.users || []);
+        if (json.users && json.users.length > 0) {
+          setSelectedUser(json.users[0].username);
+        }
+      } else {
+        console.error("Failed to load users:", json.error);
+      }
+    } catch (err) {
+      console.error("Error fetching user list:", err);
+    }
+    setFetchingUsers(false);
+  };
+
+  const triggerCustomPush = async () => {
+    if (!selectedUser) {
+      setStatus("Error: Please select a user first.");
+      return;
+    }
+
+    setStatus(`Sending push to ${selectedUser}...`);
+    try {
+      const user = usersList.find(u => u.username === selectedUser);
+      const targetId = user?.subscriptionId || user?.username;
+
+      if (!targetId) {
+        setStatus("Error: Target identifier not found.");
+        return;
+      }
+
+      const res = await fetch("/api/notifications/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: customPushTitle,
+          message: customPushMessage,
+          playerIds: [targetId]
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setStatus(`Push sent successfully to ${selectedUser}!`);
+      } else {
+        setStatus(`Failed: ${json.error || "Unknown error"}`);
+      }
+      setTimeout(() => setStatus(null), 4000);
+    } catch (err) {
+      setStatus("Error transmitting push notification");
+    }
+  };
+
   useEffect(() => {
     fetchData("vault/approve"); // Check vault status on load
     if (activeTab === "app-update") fetchData("app/update");
     if (activeTab === "permissions") fetchData("email/permission");
-  }, [activeTab]);
+    if (activeTab === "actions") fetchUsers();
+  }, [activeTab, adminToken]);
 
   const [recipientEmail, setRecipientEmail] = useState("santhoshrajk1812@gmail.com");
 
@@ -221,10 +289,87 @@ export default function Home() {
                     <p>Send an approval request email.</p>
                     <button onClick={() => triggerPush("email")} className="btn-secondary">Send Email</button>
                   </div>
-                  <div className="action-card">
-                    <h4>Push Notification</h4>
-                    <p>Send a OneSignal notification.</p>
-                    <button onClick={() => triggerPush("push")} className="btn-secondary">Trigger Push</button>
+                  <div className="action-card full-width-card" style={{ gridColumn: "span 2", padding: "20px" }}>
+                    <h4>📣 Targeted Push Notification Composer</h4>
+                    <p className="description" style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", marginBottom: "16px" }}>
+                      Fetch registered accounts, select a target, and broadcast a customized push notification using their OneSignal subscription ID or username alias.
+                    </p>
+                    
+                    <div className="composer-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px", textAlign: "left" }}>
+                      <div className="composer-col">
+                        <div className="input-group-compact" style={{ marginBottom: "12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                            <label style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", color: "#60a5fa" }}>Target Recipient</label>
+                            <button 
+                              onClick={fetchUsers} 
+                              className="btn-refresh" 
+                              style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: "11px", padding: "0" }}
+                            >
+                              {fetchingUsers ? "Loading..." : "🔄 Refresh List"}
+                            </button>
+                          </div>
+                          {usersList.length === 0 ? (
+                            <div className="no-users-warning" style={{ fontSize: "12px", color: "#f87171", padding: "8px", background: "rgba(248, 113, 113, 0.1)", borderRadius: "6px", border: "1px solid rgba(248,113,113,0.2)" }}>
+                              No users found. Ensure admin credentials are correct and users are registered in KV.
+                            </div>
+                          ) : (
+                            <select 
+                              value={selectedUser} 
+                              onChange={(e) => setSelectedUser(e.target.value)}
+                              className="custom-select"
+                              style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                            >
+                              {usersList.map((u) => (
+                                <option key={u.username} value={u.username} style={{ background: "#111" }}>
+                                  {u.username} ({u.role}) — {u.subscriptionId ? "📱 Active Device" : "❌ No Device Token"}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+
+                        {selectedUser && (
+                          <div className="user-token-info" style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
+                            Resolved Target: <code style={{ color: "#38bdf8", fontSize: "10px", background: "rgba(0,0,0,0.2)", padding: "2px 4px", borderRadius: "3px" }}>
+                              {usersList.find(u => u.username === selectedUser)?.subscriptionId || `alias: ${selectedUser}`}
+                            </code>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="composer-col">
+                        <div className="input-group-compact" style={{ marginBottom: "8px" }}>
+                          <label style={{ display: "block", fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", color: "#60a5fa", marginBottom: "4px" }}>Push Title</label>
+                          <input 
+                            type="text" 
+                            value={customPushTitle} 
+                            onChange={(e) => setCustomPushTitle(e.target.value)}
+                            placeholder="e.g. Cosmic Alignment"
+                            style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                          />
+                        </div>
+
+                        <div className="input-group-compact">
+                          <label style={{ display: "block", fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", color: "#60a5fa", marginBottom: "4px" }}>Push Message</label>
+                          <input 
+                            type="text" 
+                            value={customPushMessage} 
+                            onChange={(e) => setCustomPushMessage(e.target.value)}
+                            placeholder="Message content..."
+                            style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={triggerCustomPush} 
+                      className="btn-primary" 
+                      style={{ width: "100%", padding: "10px", cursor: "pointer", border: "none", marginTop: "8px" }}
+                      disabled={usersList.length === 0}
+                    >
+                      🚀 Broadcast Targeted Push Notification
+                    </button>
                   </div>
                   <div className="action-card">
                     <h4>Sanctuary Vault</h4>
